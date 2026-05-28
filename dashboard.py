@@ -29,8 +29,8 @@ st.markdown("""
 # ── Load data ────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    url = 'https://drive.google.com/uc?export=download&id=1-v02trbJrD4yIE8iUWzCcvwqvROfnI9E'
-    df = pd.read_csv(url, sep='\t', encoding='utf-8', on_bad_lines='skip')
+    url = 'https://drive.google.com/uc?export=download&id=1bl-bRZHlgqOmhm6D6MBsOJ11eccVZbhl'
+    df = pd.read_csv(url, encoding='utf-8', on_bad_lines='skip')
     df.columns = df.columns.str.strip()
 
     def extract_label(text):
