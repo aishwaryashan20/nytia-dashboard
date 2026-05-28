@@ -34,7 +34,10 @@ def load_data():
         df = pd.read_csv(url, sep=',', engine='python', encoding='utf-8')
     except:
         df = pd.read_csv(url, sep=',', engine='python', encoding='latin1')
-
+    
+    # Fix column names
+    df.columns = df.columns.str.strip()
+    
     def extract_label(text):
         if pd.isna(text): return 'Unknown'
         text = str(text).strip().replace('\u2019',"'").replace('\u2018',"'")
