@@ -29,7 +29,7 @@ st.markdown("""
 # ── Load data ────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    url = 'https://drive.google.com/uc?export=download&id=1bl-bRZHlgqOmhm6D6MBsOJ11eccVZbhl'
+    url = 'https://huggingface.co/datasets/Aish200666/nytia_analysis/resolve/main/sample_clean.csv'
     df = pd.read_csv(url, encoding='utf-8', on_bad_lines='skip')
     df.columns = df.columns.str.strip()
 
