@@ -29,15 +29,10 @@ st.markdown("""
 # ── Load data ────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    url = 'https://drive.google.com/uc?id=1-v02trbJrD4yIE8iUWzCcvwqvROfnI9E'
-    try:
-        df = pd.read_csv(url, sep=',', engine='python', encoding='utf-8')
-    except:
-        df = pd.read_csv(url, sep=',', engine='python', encoding='latin1')
-    
-    # Fix column names
+    url = 'https://drive.google.com/uc?export=download&id=1-v02trbJrD4yIE8iUWzCcvwqvROfnI9E'
+    df = pd.read_csv(url, sep=',', encoding='utf-8', on_bad_lines='skip')
     df.columns = df.columns.str.strip()
-    
+
     def extract_label(text):
         if pd.isna(text): return 'Unknown'
         text = str(text).strip().replace('\u2019',"'").replace('\u2018',"'")
