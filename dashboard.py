@@ -3,8 +3,6 @@ st_autorefresh(interval=240000, limit=None, key="keepalive")
 
 import streamlit as st
 import pandas as pd
-import streamlit as st
-import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
@@ -32,10 +30,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Load data ────────────────────────────────────────────────
-@st.cache_data
+@st.cache_data(ttl=7200, show_spinner="Loading health data...")
 def load_data():
     url = 'https://huggingface.co/datasets/Aish200666/nytia_analysis/resolve/main/sample_clean.csv'
-    df = pd.read_csv(url, encoding='utf-8', on_bad_lines='skip')
+    df = pd.read_csv(url, encoding='utf-8', on_bad_lines='skip', low_memory=False)
     df.columns = df.columns.str.strip()
 
     def extract_label(text):
@@ -64,7 +62,12 @@ def load_data():
     df['risk_tier'] = df['domains_in_decline'].apply(assign_tier)
     return df, dif_cols
 
-df, dif_cols = load_data()
+# ── Load once at top level ───────────────────────────────────
+try:
+    df, dif_cols = load_data()
+except Exception as e:
+    st.error(f"Data loading failed: {e}. Please refresh the page.")
+    st.stop()
 
 TIER_COLORS   = {'CRITICAL':'#B71C1C','HIGH':'#E53935','MEDIUM':'#FB8C00','LOW':'#43A047'}
 STATUS_COLORS = {'Be Careful':'#E53935','Declining':'#FB8C00',
@@ -360,13 +363,19 @@ elif page == "🔎 User Explorer":
         sel_status = st.selectbox("Filter by Status:",
                                   ['All','Be Careful','Declining','Keep It Up','Making Progress'])
 
-    filtered = df.copy()
-    if sel_tier   != 'All': filtered = filtered[filtered['risk_tier']   == sel_tier]
-    if sel_status != 'All': filtered = filtered[filtered['status_label']== sel_status]
+    # Use query instead of copy to save memory
+    if sel_tier != 'All' and sel_status != 'All':
+        filtered = df[(df['risk_tier'] == sel_tier) & (df['status_label'] == sel_status)]
+    elif sel_tier != 'All':
+        filtered = df[df['risk_tier'] == sel_tier]
+    elif sel_status != 'All':
+        filtered = df[df['status_label'] == sel_status]
+    else:
+        filtered = df
 
-    st.markdown(f"**Showing {len(filtered):,} users**")
+    st.markdown(f"**Showing {len(filtered):,} users (displaying first 100)**")
     display_cols = dif_cols + ['status_label','risk_tier','domains_in_decline']
-    st.dataframe(filtered[display_cols].head(200), use_container_width=True, hide_index=True)
+    st.dataframe(filtered[display_cols].head(100), use_container_width=True, hide_index=True)
 
     if sel_tier != 'All':
         st.markdown(f"### Domain Profile — {sel_tier} Tier")
