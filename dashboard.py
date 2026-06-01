@@ -1,6 +1,7 @@
 from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=240000, limit=None, key="keepalive")
 
+import gc
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,6 +9,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import warnings
 warnings.filterwarnings('ignore')
+
+gc.collect()
 
 st.set_page_config(
     page_title="Nytia Health — Risk Intelligence Dashboard",
@@ -29,8 +32,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── Load data ────────────────────────────────────────────────
-@st.cache_data(ttl=7200, show_spinner="Loading health data...")
+@st.cache_data(ttl=7200, max_entries=1, show_spinner="Loading health data...")
 def load_data():
     url = 'https://huggingface.co/datasets/Aish200666/nytia_analysis/resolve/main/sample_clean.csv'
     df = pd.read_csv(url, encoding='utf-8', on_bad_lines='skip', low_memory=False)
@@ -60,14 +62,19 @@ def load_data():
         else:        return 'LOW'
 
     df['risk_tier'] = df['domains_in_decline'].apply(assign_tier)
+
+    # Keep only needed columns to save memory
+    keep_cols = dif_cols + ['status_label', 'risk_tier', 'domains_in_decline']
+    df = df[keep_cols]
     return df, dif_cols
 
-# ── Load once at top level ───────────────────────────────────
 try:
     df, dif_cols = load_data()
 except Exception as e:
-    st.error(f"Data loading failed: {e}. Please refresh the page.")
+    st.error(f"Data loading failed. Please refresh the page.")
     st.stop()
+
+gc.collect()
 
 TIER_COLORS   = {'CRITICAL':'#B71C1C','HIGH':'#E53935','MEDIUM':'#FB8C00','LOW':'#43A047'}
 STATUS_COLORS = {'Be Careful':'#E53935','Declining':'#FB8C00',
@@ -75,7 +82,6 @@ STATUS_COLORS = {'Be Careful':'#E53935','Declining':'#FB8C00',
 TIER_ORDER    = ['CRITICAL','HIGH','MEDIUM','LOW']
 tier_counts   = df['risk_tier'].value_counts()
 
-# ── Sidebar ──────────────────────────────────────────────────
 st.sidebar.title("🏥 Nytia Health")
 st.sidebar.markdown("**Risk Intelligence Dashboard**")
 st.sidebar.markdown("---")
@@ -91,9 +97,8 @@ page = st.sidebar.radio("Navigate", [
     "🔎 User Explorer"
 ])
 
-# ════════════════════════════════════════════════════════════
-# PAGE 1 — EXECUTIVE SUMMARY
-# ════════════════════════════════════════════════════════════
+gc.collect()
+
 if page == "📊 Executive Summary":
     st.title("🏥 Nytia Health — Risk Intelligence Dashboard")
     st.markdown("##### Proactive Health Risk Stratification | 500K Sample | BigQuery ML XGBoost | Spring 2026")
@@ -129,16 +134,11 @@ if page == "📊 Executive Summary":
 
     st.markdown("---")
     ca, cb = st.columns(2)
-
     with ca:
         st.markdown("### Risk Tier Distribution")
-        fig = px.pie(
-            values=[tier_counts.get(t,0) for t in TIER_ORDER],
-            names=TIER_ORDER,
-            color=TIER_ORDER,
-            color_discrete_map=TIER_COLORS,
-            hole=0.4
-        )
+        fig = px.pie(values=[tier_counts.get(t,0) for t in TIER_ORDER],
+                     names=TIER_ORDER, color=TIER_ORDER,
+                     color_discrete_map=TIER_COLORS, hole=0.4)
         fig.update_traces(textposition='outside', textinfo='percent+label')
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=350)
         st.plotly_chart(fig, use_container_width=True)
@@ -165,9 +165,6 @@ if page == "📊 Executive Summary":
     with i3:
         st.success("**XGBoost model** achieves 96.1% accuracy and 0.998 ROC AUC — identifying 97-98 out of every 100 at-risk users correctly.")
 
-# ════════════════════════════════════════════════════════════
-# PAGE 2 — RISK TIER ANALYSIS
-# ════════════════════════════════════════════════════════════
 elif page == "🎯 Risk Tier Analysis":
     st.title("🎯 Risk Tier Analysis")
     st.markdown("---")
@@ -200,41 +197,28 @@ elif page == "🎯 Risk Tier Analysis":
     fig3 = px.imshow(cross, color_continuous_scale='YlOrRd', text_auto=True, aspect='auto')
     fig3.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=320)
     st.plotly_chart(fig3, use_container_width=True)
+    gc.collect()
 
-# ════════════════════════════════════════════════════════════
-# PAGE 3 — HEALTH DOMAIN INSIGHTS
-# ════════════════════════════════════════════════════════════
 elif page == "🏥 Health Domain Insights":
     st.title("🏥 Health Domain Insights")
     st.markdown("---")
 
-    domain = st.selectbox("Select Domain:",
-                          options=dif_cols,
+    domain = st.selectbox("Select Domain:", options=dif_cols,
                           format_func=lambda x: x.replace('dif_','').replace('_',' ').title())
 
     dif_order = ['(-1000)-(-250)','(-250)-0','0-250','250-1000']
-    c1, c2 = st.columns(2)
 
-    with c1:
-        vc = df[domain].value_counts().reindex(dif_order, fill_value=0)
-        fig = px.bar(x=['Very Low','Low','Good','Excellent'], y=vc.values,
-                     color=['Very Low','Low','Good','Excellent'],
-                     color_discrete_map={'Very Low':'#B71C1C','Low':'#FB8C00',
-                                         'Good':'#43A047','Excellent':'#1E88E5'},
-                     text=[f'{v/len(df)*100:.1f}%' for v in vc.values],
-                     title=f'{domain} — Trajectory Distribution')
-        fig.update_traces(textposition='outside')
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
-                          showlegend=False, height=350)
-        st.plotly_chart(fig, use_container_width=True)
-
-    with c2:
-        cross2 = pd.crosstab(df[domain], df['risk_tier']).reindex(dif_order).fillna(0)
-        fig2 = px.bar(cross2, barmode='group',
-                      color_discrete_map=TIER_COLORS,
-                      title=f'{domain} — By Risk Tier')
-        fig2.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=350)
-        st.plotly_chart(fig2, use_container_width=True)
+    vc = df[domain].value_counts().reindex(dif_order, fill_value=0)
+    fig = px.bar(x=['Very Low','Low','Good','Excellent'], y=vc.values,
+                 color=['Very Low','Low','Good','Excellent'],
+                 color_discrete_map={'Very Low':'#B71C1C','Low':'#FB8C00',
+                                     'Good':'#43A047','Excellent':'#1E88E5'},
+                 text=[f'{v/len(df)*100:.1f}%' for v in vc.values],
+                 title=f'{domain} — Trajectory Distribution')
+    fig.update_traces(textposition='outside')
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
+                      showlegend=False, height=400)
+    st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("### Worst Band Concentration — All Domains")
     worst = {c.replace('dif_','').replace('_',' ').title():
@@ -247,10 +231,8 @@ elif page == "🏥 Health Domain Insights":
     fig3.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
                        xaxis_title='% Users in Worst Band', showlegend=False, height=380)
     st.plotly_chart(fig3, use_container_width=True)
+    gc.collect()
 
-# ════════════════════════════════════════════════════════════
-# PAGE 4 — FEATURE IMPORTANCE (SHAP)
-# ════════════════════════════════════════════════════════════
 elif page == "🔍 Feature Importance (SHAP)":
     st.title("🔍 Feature Importance — SHAP Analysis")
     st.markdown("##### BigQuery ML Global SHAP from ML.GLOBAL_EXPLAIN")
@@ -282,16 +264,11 @@ elif page == "🔍 Feature Importance (SHAP)":
     st.markdown("---")
     st.info("""
     **Key Finding: Trajectory completely dominates current status.**
-    
     All 8 dif_* trajectory columns are the top 8 predictors.
     All 8 c_val_* current status columns are the bottom 8 — all below 0.001 SHAP value.
-    
     **This means: where a user is heading matters far more than where they currently are.**
     """)
 
-# ════════════════════════════════════════════════════════════
-# PAGE 5 — INTERVENTION ROUTING
-# ════════════════════════════════════════════════════════════
 elif page == "📋 Intervention Routing":
     st.title("📋 Intervention Routing Framework")
     st.markdown("---")
@@ -348,10 +325,8 @@ elif page == "📋 Intervention Routing":
         ))
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=280)
         st.plotly_chart(fig, use_container_width=True)
+    gc.collect()
 
-# ════════════════════════════════════════════════════════════
-# PAGE 6 — USER EXPLORER
-# ════════════════════════════════════════════════════════════
 elif page == "🔎 User Explorer":
     st.title("🔎 User Explorer")
     st.markdown("---")
@@ -363,21 +338,21 @@ elif page == "🔎 User Explorer":
         sel_status = st.selectbox("Filter by Status:",
                                   ['All','Be Careful','Declining','Keep It Up','Making Progress'])
 
-    # Use query instead of copy to save memory
     if sel_tier != 'All' and sel_status != 'All':
-        filtered = df[(df['risk_tier'] == sel_tier) & (df['status_label'] == sel_status)]
+        mask = (df['risk_tier'] == sel_tier) & (df['status_label'] == sel_status)
     elif sel_tier != 'All':
-        filtered = df[df['risk_tier'] == sel_tier]
+        mask = df['risk_tier'] == sel_tier
     elif sel_status != 'All':
-        filtered = df[df['status_label'] == sel_status]
+        mask = df['status_label'] == sel_status
     else:
-        filtered = df
+        mask = pd.Series([True] * len(df), index=df.index)
 
+    filtered = df[mask]
     st.markdown(f"**Showing {len(filtered):,} users (displaying first 100)**")
-    display_cols = dif_cols + ['status_label','risk_tier','domains_in_decline']
-    st.dataframe(filtered[display_cols].head(100), use_container_width=True, hide_index=True)
+    st.dataframe(filtered[dif_cols + ['status_label','risk_tier','domains_in_decline']].head(100),
+                 use_container_width=True, hide_index=True)
 
-    if sel_tier != 'All':
+    if sel_tier != 'All' and len(filtered) > 0:
         st.markdown(f"### Domain Profile — {sel_tier} Tier")
         worst = {c.replace('dif_','').replace('_',' ').title():
                  (filtered[c]=='(-1000)-(-250)').sum()/len(filtered)*100 for c in dif_cols}
@@ -390,3 +365,4 @@ elif page == "🔎 User Explorer":
                           xaxis_title='Health Domain', yaxis_title='% in Worst Band',
                           showlegend=False, height=380)
         st.plotly_chart(fig, use_container_width=True)
+    gc.collect()
