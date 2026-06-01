@@ -1,3 +1,8 @@
+from streamlit_autorefresh import st_autorefresh
+st_autorefresh(interval=240000, limit=None, key="keepalive")
+
+import streamlit as st
+import pandas as pd
 import streamlit as st
 import pandas as pd
 import numpy as np
