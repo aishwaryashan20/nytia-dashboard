@@ -217,28 +217,28 @@ elif page == "🏥 Health Domain Insights":
     dif_order = ['(-1000)-(-250)','(-250)-0','0-250','250-1000']
 
     vc = df[domain].value_counts().reindex(dif_order, fill_value=0)
-    fig = px.bar(x=['Very Low','Low','Good','Excellent'], y=vc.values,
+    fig_traj = px.bar(x=['Very Low','Low','Good','Excellent'], y=vc.values,
                  color=['Very Low','Low','Good','Excellent'],
                  color_discrete_map={'Very Low':'#B71C1C','Low':'#FB8C00',
                                      'Good':'#43A047','Excellent':'#1E88E5'},
                  text=[f'{v/len(df)*100:.1f}%' for v in vc.values],
                  title=f'{domain} — Trajectory Distribution')
-    fig.update_traces(textposition='outside')
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
+    fig_traj.update_traces(textposition='outside')
+    fig_traj.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
                       showlegend=False, height=400)
-    st.plotly_chart(fig3, use_container_width=True, key="domain_traj")
+    st.plotly_chart(fig_traj, use_container_width=True, key="domain_traj")
 
     st.markdown("### Worst Band Concentration — All Domains")
     worst = {c.replace('dif_','').replace('_',' ').title():
              (df[c]=='(-1000)-(-250)').sum()/len(df)*100 for c in dif_cols}
     ws = pd.Series(worst).sort_values(ascending=True)
-    fig3 = px.bar(x=ws.values, y=ws.index, orientation='h',
+    fig_worst = px.bar(x=ws.values, y=ws.index, orientation='h',
                   color=ws.values, color_continuous_scale='RdYlGn_r',
                   text=[f'{v:.1f}%' for v in ws.values])
-    fig3.update_traces(textposition='outside')
-    fig3.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
+    fig_worst.update_traces(textposition='outside')
+    fig_worst.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
                        xaxis_title='% Users in Worst Band', showlegend=False, height=380)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_worst, use_container_width=True, key="domain_worst")
     gc.collect()
 
 # ════════════════════════════════════════════════════════════
