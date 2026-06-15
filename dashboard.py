@@ -226,7 +226,7 @@ elif page == "🏥 Health Domain Insights":
     fig.update_traces(textposition='outside')
     fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
                       showlegend=False, height=400)
-    st.plotly_chart(fig, use_container_width=True, key="domain_traj")
+    st.plotly_chart(fig3, use_container_width=True, key="domain_traj")
 
     st.markdown("### Worst Band Concentration — All Domains")
     worst = {c.replace('dif_','').replace('_',' ').title():
